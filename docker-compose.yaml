@@ -1,0 +1,23 @@
+version: "3.6"
+
+services:
+
+    main:
+        build:
+            context: ./main
+            dockerfile: Dockerfile
+        image: klleon:main
+        ports:
+            - "8000:8000"
+
+    separate:
+        build:
+            context: ./temp
+            dockerfile: Dockerfile
+        image: klleon:separate
+        ports:
+            - "7000:7000"
+        deploy:
+          resources:
+            limits:
+              memory: 4GB
