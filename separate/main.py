@@ -29,7 +29,7 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
     if output_files:
         urls = []  # 다운로드 링크를 담을 리스트
         for output_file in output_files:
-            blob = bucket.blob(f"{token}-{filename_only}_{output_file.split('/')[-1]}")  # 객체 이름 설정
+            blob = bucket.blob(f"{token}_{filename_only}_{output_file.split('/')[-1]}")  # 객체 이름 설정
             blob.upload_from_filename(output_file)  # 객체 생성
             blob.make_public()  # 객체 공개화
             urls.append(blob.public_url)  # 다운로드 링크 추가
