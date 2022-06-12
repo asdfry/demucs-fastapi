@@ -4,3 +4,5 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/klleon:separate']
 timeout: 1200s
+options:
+  machineType: 'N1_HIGHCPU_8'
