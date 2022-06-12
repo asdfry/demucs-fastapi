@@ -1,7 +1,6 @@
 FROM python:3.8-slim
 
-# COPY requirements.txt main.py key.json ./
-COPY requirements.txt key.json ./
+COPY main.py requirements.txt key.json ./
 
 RUN apt update && apt install -y git ffmpeg && \
     cat requirements.txt | grep -v '^#' | xargs -n 1 -L 1 pip install --timeout 60 --no-cache-dir && \

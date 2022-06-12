@@ -1,10 +1,11 @@
+import json
+import os
 from threading import Thread
 from uuid import uuid4
 
-import json
 import requests
-from google.cloud import firestore
 from fastapi import Body, FastAPI, File, UploadFile
+from google.cloud import firestore
 
 firestore_client = firestore.Client()
 collection = firestore_client.collection("klleon")
@@ -13,7 +14,7 @@ app = FastAPI()
 
 def request_separate(upload_file, filename, token):
     requests.post(
-        url="http://separate:7000/separate",
+        url=os.environ.get("SEP_API_URL"),
         files={"upload_file": upload_file},
         data={"filename": filename, "token": token},
     )

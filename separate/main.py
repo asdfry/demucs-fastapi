@@ -26,14 +26,19 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
 
-    urls = []  # 다운로드 링크를 담을 리스트
-    for output_file in output_files:
-        blob = bucket.blob(f"{token}-{filename_only}_{output_file.split('/')[-1]}")  # 객체 이름 설정
-        blob.upload_from_filename(output_file)  # 객체 생성
-        blob.make_public()  # 객체 공개화
-        urls.append(blob.public_url)  # 다운로드 링크 추가
+    if output_files:
+        urls = []  # 다운로드 링크를 담을 리스트
+        for output_file in output_files:
+            blob = bucket.blob(f"{token}-{filename_only}_{output_file.split('/')[-1]}")  # 객체 이름 설정
+            blob.upload_from_filename(output_file)  # 객체 생성
+            blob.make_public()  # 객체 공개화
+            urls.append(blob.public_url)  # 다운로드 링크 추가
 
-    collection.document(token).set(  # 상태 변경 및 다운로드 링크 추가
-        {"status": "done", "path": urls, "time": round((time.time() - start_time), 3)}
-    )
-    os.system(f"rm '{filename}' && rm -rf /separated")
+        collection.document(token).set(  # 상태 변경 및 다운로드 링크 추가
+            {"status": "done", "path": urls, "time": round((time.time() - start_time), 3)}
+        )
+        os.system(f"rm '{filename}' && rm -rf /separated")
+    else:
+        collection.document(token).set(  # 상태 변경
+            {"status": "fail", "time": round((time.time() - start_time), 3)}
+        )
