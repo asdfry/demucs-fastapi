@@ -3,3 +3,4 @@ steps:
   args: ['build', '-t', 'gcr.io/$PROJECT_ID/klleon:separate', '.']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'gcr.io/$PROJECT_ID/klleon:separate']
+timeout: 20m
