@@ -31,7 +31,7 @@ def create_job(upload_file: UploadFile = File(...)):
     return {"status": 201, "message": "created", "token": token}
 
 
-@app.get("/result", status_code=200)
+@app.post("/result", status_code=200)
 def get_result(body=Body(...)):
     token = json.loads(body.decode())["token"]
     doc = collection.document(token).get().to_dict()
