@@ -2,18 +2,22 @@ version: "3.6"
 
 services:
 
-    main:
-        build:
-            context: ./main
-            dockerfile: Dockerfile
-        image: klleon:main
-        ports:
-            - "8000:8000"
+  main:
+    build:
+      context: ./main
+      dockerfile: Dockerfile
+    image: klleon:main
+    ports:
+      - "8000:8000"
+    environment:
+      - SEP_API_URL=http://separate:7000/separate
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
 
-    separate:
-        build:
-            context: ./separate
-            dockerfile: Dockerfile
-        image: klleon:separate
-        ports:
-            - "7000:7000"
+  separate:
+    build:
+      context: ./separate
+      dockerfile: Dockerfile
+    image: klleon:separate
+    ports:
+      - "7000:7000"
+    command: uvicorn main:app --host 0.0.0.0 --port 7000
