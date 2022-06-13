@@ -1,0 +1,2 @@
+curl -X POST https://klleon-main-n6my7u6wuq-dt.a.run.app/job_file -H "Content-Type:multipart/form-data" -F upload_file=@./test_5s.wav
+curl -X POST https://klleon-main-n6my7u6wuq-dt.a.run.app/result -H "Content-Type: application/json" -d '{"token":"f4ddb5b7-277f-4a08-8cca-1f7568415208"}'
