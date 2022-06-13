@@ -12,12 +12,8 @@ services:
 
     separate:
         build:
-            context: ./temp
+            context: ./separate
             dockerfile: Dockerfile
         image: klleon:separate
         ports:
             - "7000:7000"
-        deploy:
-          resources:
-            limits:
-              memory: 8GB
