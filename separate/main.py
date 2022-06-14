@@ -13,6 +13,13 @@ collection = firestore_client.collection("klleon")
 app = FastAPI()
 
 
+def second_to_duration(sec) -> str:
+    sec = int(sec)
+    hours, remainder = divmod(sec, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{str(hours).zfill(2)}:{str(minutes).zfill(2)}:{str(seconds).zfill(2)}"
+
+
 @app.post("/separate")
 def separate(upload_file: UploadFile = File(...), filename: str = Form(...), token: str = Form(...)):
 
@@ -22,7 +29,9 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
     with open(filename, "wb") as buffer:  # 오디오 파일 복사
         shutil.copyfileobj(upload_file.file, buffer)
 
-    collection.document(token).set({"status": "progress"})  # 상태 변경
+    # Firestore 데이터 업데이트
+    collection.document(token).update({"status": "progress"})
+
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
 
@@ -34,11 +43,11 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
             blob.make_public()  # 객체 공개화
             urls.append(blob.public_url)  # 다운로드 링크 추가
 
-        collection.document(token).set(  # 상태 변경 및 다운로드 링크 추가
-            {"status": "done", "path": urls, "time": round((time.time() - start_time), 3)}
+        collection.document(token).update(  # Firestore 데이터 업데이트 및 다운로드 링크 추가
+            {"status": "done", "path": urls, "progress_time": round((time.time() - start_time), 3)}
         )
         os.system(f"rm '{filename}' && rm -rf /separated")
     else:
-        collection.document(token).set(  # 상태 변경
-            {"status": "fail", "time": round((time.time() - start_time), 3)}
+        collection.document(token).update(  # Firestore 데이터 업데이트
+            {"status": "fail", "progress_time": round((time.time() - start_time), 3)}
         )
