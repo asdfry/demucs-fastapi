@@ -11,8 +11,4 @@ RUN apt update && apt install -y git ffmpeg && \
     python3 -m demucs.separate -d cpu test.mp3 && \
     rm -r separated
 
-VOLUME /data/models
-
-VOLUME /data/models
-
 # CMD uvicorn main:app --host 0.0.0.0 --port 7000
