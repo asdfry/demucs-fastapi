@@ -1,13 +1,14 @@
-import os
-import shutil
 import datetime
+import os
 from threading import Thread
 from urllib.request import urlretrieve
+from urllib.error import HTTPError, URLError
 from uuid import uuid4
 
 import audioread
 import requests
-from fastapi import Body, FastAPI, File, UploadFile
+from fastapi import Body, FastAPI, File, UploadFile, status
+from fastapi.responses import JSONResponse
 from google.cloud import firestore
 
 firestore_client = firestore.Client()
@@ -41,12 +42,6 @@ def second_to_duration(sec) -> str:
 @app.post("/job_file", status_code=201)
 def create_job_file(upload_file: UploadFile = File(...)):
 
-    with open(upload_file.filename, "wb") as f:  # 오디오 파일 복사
-        shutil.copyfileobj(upload_file.file, f)
-
-    with audioread.audio_open(upload_file.filename) as f:  # 오디오 정보 확인
-        duration = f.duration
-
     # Firestore 데이터 생성
     token = create_token()
     collection.document(token).set(
@@ -54,15 +49,12 @@ def create_job_file(upload_file: UploadFile = File(...)):
             "create_time": datetime.datetime.utcnow(),
             "status": "wait",
             "filename": upload_file.filename,
-            "duration": second_to_duration(duration),
         }
     )
-    audio_file = open(upload_file.filename, "rb")
 
     Thread(  # 쓰레드를 통해 separate API 호출
-        target=request_separate, args=[audio_file, upload_file.filename, token]
+        target=request_separate, args=[upload_file.file, upload_file.filename, token]
     ).start()
-    os.system(f"rm {upload_file.filename}")  # 복사한 오디오 파일 삭제
 
     return {"status": 201, "message": "created", "token": token}
 
@@ -73,7 +65,9 @@ def create_job_url(body=Body(...)):
     if "url" in body:
         url = body["url"]
     else:
-        return {"status": 400, "message": "'url' not in body"}
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "'url' not in body"}
+        )
 
     try:
         filename, _ = urlretrieve(url)  # 오디오 파일 복사 (filename 예시: /tmp/tmpo613nsz5)
@@ -94,15 +88,25 @@ def create_job_url(body=Body(...)):
         )
         audio_file = open(filename, "rb")
 
-        Thread(  # 쓰레드를 통해 separate API 호출
-            target=request_separate, args=[audio_file, filename_wt_slash, token]
-        ).start()
+        Thread(target=request_separate, args=[audio_file, filename_wt_slash, token]).start()  # 쓰레드를 통해 separate API 호출
         os.system(f"rm {filename}")  # 복사한 오디오 파일 삭제
 
         return {"status": 201, "message": "created", "token": token}
 
+    except HTTPError:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "HTTPError"}
+        )
+
+    except URLError:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "URLError"}
+        )
+
     except Exception as e:
-        return {"status": 400, "message": e}
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": str(e)}
+        )
 
 
 @app.post("/result", status_code=200)
@@ -118,3 +122,23 @@ def get_result(body=Body(...)):
             "message": doc["status"],
             "data": {"accompaniment": doc["path"][0], "vocals": doc["path"][1]},
         }
+
+
+@app.get("/all-result", status_code=200)
+def get_all_result():
+    dict_return = {}
+    for idx, doc in enumerate(collection.stream()):
+        dict_temp = doc.to_dict()
+        dict_return[idx] = {
+            "date": dict_temp["create_time"],
+            "token": doc.id,
+            "filename": dict_temp["filename"],
+            "status": dict_temp["status"]
+        }
+        if dict_temp["status"] == "done":  # 완료된 작업인 경우 정보 추가
+            dict_return[idx]["accompaniment"] = dict_temp["path"][0]
+            dict_return[idx]["vocal"] = dict_temp["path"][1]
+            dict_return[idx]["length"] = dict_temp["duration"]
+            dict_return[idx]["process_time"] = dict_temp["process_time"]
+
+    return dict_return

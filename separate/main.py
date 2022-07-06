@@ -3,6 +3,7 @@ import shutil
 import time
 from glob import glob
 
+import audioread
 from fastapi import FastAPI, File, Form, UploadFile
 from google.cloud import firestore, storage
 
@@ -30,7 +31,13 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
         shutil.copyfileobj(upload_file.file, buffer)
 
     # Firestore 데이터 업데이트
-    collection.document(token).update({"status": "progress"})
+    if not "duration" in collection.document(token).get().to_dict():  # duration 정보가 없는 경우 (upload_file을 file로 받은 경우)
+        with audioread.audio_open(filename) as f:  # 오디오 정보 확인
+            duration = f.duration
+        collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
+    else:
+        collection.document(token).update({"status": "progress"})
+
 
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
@@ -44,10 +51,10 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
             urls.append(blob.public_url)  # 다운로드 링크 추가
 
         collection.document(token).update(  # Firestore 데이터 업데이트 및 다운로드 링크 추가
-            {"status": "done", "path": urls, "progress_time": round((time.time() - start_time), 3)}
+            {"status": "done", "path": urls, "process_time": round((time.time() - start_time), 3)}
         )
         os.system(f"rm '{filename}' && rm -rf /separated")
     else:
         collection.document(token).update(  # Firestore 데이터 업데이트
-            {"status": "fail", "progress_time": round((time.time() - start_time), 3)}
+            {"status": "fail", "process_time": round((time.time() - start_time), 3)}
         )
