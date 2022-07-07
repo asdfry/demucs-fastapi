@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from google.cloud import firestore
 
 firestore_client = firestore.Client()
-collection = firestore_client.collection("klleon")
+collection = firestore_client.collection(os.environ.get("COLLECTION_NAME"))
 app = FastAPI()
 
 

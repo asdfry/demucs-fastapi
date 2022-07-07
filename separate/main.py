@@ -8,9 +8,9 @@ from fastapi import FastAPI, File, Form, UploadFile
 from google.cloud import firestore, storage
 
 storage_client = storage.Client()
-bucket = storage_client.bucket("klleon-output")
+bucket = storage_client.bucket(os.environ.get("BUCKET_NAME"))
 firestore_client = firestore.Client()
-collection = firestore_client.collection("klleon")
+collection = firestore_client.collection(os.environ.get("COLLECTION_NAME"))
 app = FastAPI()
 
 
