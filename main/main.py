@@ -126,19 +126,20 @@ def get_result(body=Body(...)):
 
 @app.get("/all-result", status_code=200)
 def get_all_result():
-    dict_return = {}
-    for idx, doc in enumerate(collection.stream()):
+    docs = []
+    for doc in collection.stream():
         dict_temp = doc.to_dict()
-        dict_return[idx] = {
+        docs.append({
             "date": dict_temp["create_time"],
             "token": doc.id,
             "filename": dict_temp["filename"],
             "status": dict_temp["status"]
-        }
+        })
         if dict_temp["status"] == "done":  # 완료된 작업인 경우 정보 추가
-            dict_return[idx]["accompaniment"] = dict_temp["path"][0]
-            dict_return[idx]["vocal"] = dict_temp["path"][1]
-            dict_return[idx]["length"] = dict_temp["duration"]
-            dict_return[idx]["process_time"] = dict_temp["process_time"]
-
+            docs[-1]["accompaniment"] = dict_temp["path"][0]
+            docs[-1]["vocal"] = dict_temp["path"][1]
+            docs[-1]["length"] = dict_temp["duration"]
+            docs[-1]["process_time"] = dict_temp["process_time"]
+    docs = sorted(docs, key=lambda x: x["date"])
+    dict_return = {idx:doc for idx, doc in enumerate(docs)}
     return dict_return
