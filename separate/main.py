@@ -40,12 +40,9 @@ def separate(
         filename_only = filename.split(".")[0]
 
     # Firestore 데이터 업데이트
-    if not "duration" in collection.document(token).get().to_dict():  # duration 정보가 없는 경우 (upload_file을 file로 받은 경우)
-        with audioread.audio_open(filename) as f:  # 오디오 정보 확인
-            duration = f.duration
-        collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
-    else:
-        collection.document(token).update({"status": "progress"})
+    with audioread.audio_open(filename) as f:  # 오디오 정보 확인
+        duration = f.duration
+    collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
 
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
