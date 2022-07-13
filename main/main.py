@@ -1,12 +1,10 @@
 import datetime
 import os
-from threading import Thread
-from urllib.request import urlretrieve
 from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 from uuid import uuid4
 
-import audioread
-import requests
+import httpx
 from fastapi import Body, FastAPI, File, UploadFile, status
 from fastapi.responses import JSONResponse
 from google.cloud import firestore
@@ -24,12 +22,21 @@ def create_token():
     return token
 
 
-def request_separate(upload_file, filename, token):
-    requests.post(
-        url=os.environ.get("SEP_API_URL"),
-        files={"upload_file": upload_file},
-        data={"filename": filename, "token": token},
-    )
+async def request_separate(upload_file=None, filename=None, token=None, fileurl=None):
+    async with httpx.AsyncClient() as client:
+        if fileurl:
+            await client.post(
+                url=os.environ.get("SEP_API_URL"),
+                data={"fileurl": fileurl, "token": token},
+                timeout=0.1,
+            )
+        else:
+            await client.post(
+                url=os.environ.get("SEP_API_URL"),
+                files={"upload_file": upload_file},
+                data={"filename": filename, "token": token},
+                timeout=0.1,
+            )
 
 
 def second_to_duration(sec) -> str:
@@ -40,7 +47,7 @@ def second_to_duration(sec) -> str:
 
 
 @app.post("/job_file", status_code=201)
-def create_job_file(upload_file: UploadFile = File(...)):
+async def create_job_file(upload_file: UploadFile = File(...)):
 
     # Firestore 데이터 생성
     token = create_token()
@@ -52,15 +59,14 @@ def create_job_file(upload_file: UploadFile = File(...)):
         }
     )
 
-    Thread(  # 쓰레드를 통해 separate API 호출
-        target=request_separate, args=[upload_file.file, upload_file.filename, token]
-    ).start()
-
-    return {"status": 201, "message": "created", "token": token}
+    try:  # 비동기 요청
+        await request_separate(upload_file=upload_file.file, filename=upload_file.filename, token=token)
+    except httpx.ReadTimeout:
+        return {"status": 201, "message": "created", "token": token}
 
 
 @app.post("/job_url", status_code=201)
-def create_job_url(body=Body(...)):
+async def create_job_url(body=Body(...)):
 
     if "url" in body:
         url = body["url"]
@@ -70,43 +76,30 @@ def create_job_url(body=Body(...)):
         )
 
     try:
-        filename, _ = urlretrieve(url)  # 오디오 파일 복사 (filename 예시: /tmp/tmpo613nsz5)
-        filename_wt_slash = filename.split("/")[-1]
-
-        with audioread.audio_open(filename) as f:  # 오디오 정보 확인
-            duration = f.duration
-
-        # Firestore 데이터 생성
-        token = create_token()
-        collection.document(token).set(
-            {
-                "create_time": datetime.datetime.utcnow(),
-                "status": "wait",
-                "filename": filename_wt_slash,
-                "duration": second_to_duration(duration),
-            }
-        )
-        audio_file = open(filename, "rb")
-
-        Thread(target=request_separate, args=[audio_file, filename_wt_slash, token]).start()  # 쓰레드를 통해 separate API 호출
-        os.system(f"rm {filename}")  # 복사한 오디오 파일 삭제
-
-        return {"status": 201, "message": "created", "token": token}
+        urlopen(url)  # 오디오 파일 복사 (filename 예시: /tmp/tmpo613nsz5)
 
     except HTTPError:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "HTTPError"}
-        )
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "HTTPError"})
 
     except URLError:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "URLError"}
-        )
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "URLError"})
 
     except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": str(e)}
-        )
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": str(e)})
+
+    # Firestore 데이터 생성
+    token = create_token()
+    collection.document(token).set(
+        {
+            "create_time": datetime.datetime.utcnow(),
+            "status": "wait",
+        }
+    )
+
+    try:  # 비동기 요청
+        await request_separate(fileurl=url, token=token)
+    except httpx.ReadTimeout:
+        return {"status": 201, "message": "created", "token": token}
 
 
 @app.post("/result", status_code=200)
@@ -129,17 +122,19 @@ def get_all_result():
     docs = []
     for doc in collection.stream():
         dict_temp = doc.to_dict()
-        docs.append({
-            "date": dict_temp["create_time"],
-            "token": doc.id,
-            "filename": dict_temp["filename"],
-            "status": dict_temp["status"]
-        })
+        docs.append(
+            {
+                "date": dict_temp["create_time"],
+                "token": doc.id,
+                "filename": dict_temp["filename"],
+                "status": dict_temp["status"],
+            }
+        )
         if dict_temp["status"] == "done":  # 완료된 작업인 경우 정보 추가
             docs[-1]["accompaniment"] = dict_temp["path"][0]
             docs[-1]["vocal"] = dict_temp["path"][1]
             docs[-1]["length"] = dict_temp["duration"]
             docs[-1]["process_time"] = dict_temp["process_time"]
     docs = sorted(docs, key=lambda x: x["date"])
-    dict_return = {idx:doc for idx, doc in enumerate(docs)}
+    dict_return = {idx: doc for idx, doc in enumerate(docs)}
     return dict_return

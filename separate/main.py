@@ -1,12 +1,15 @@
+import logging
 import os
 import shutil
 import time
 from glob import glob
+from urllib.request import urlretrieve
 
 import audioread
 from fastapi import FastAPI, File, Form, UploadFile
 from google.cloud import firestore, storage
 
+logger = logging.getLogger("uvicorn")
 storage_client = storage.Client()
 bucket = storage_client.bucket(os.environ.get("BUCKET_NAME"))
 firestore_client = firestore.Client()
@@ -22,13 +25,19 @@ def second_to_duration(sec) -> str:
 
 
 @app.post("/separate")
-def separate(upload_file: UploadFile = File(...), filename: str = Form(...), token: str = Form(...)):
+def separate(
+    upload_file: UploadFile = File(None), filename: str = Form(None), token: str = Form(None), fileurl=Form(None)
+):
 
     start_time = time.time()
-    filename_only = filename.split(".")[0]
 
-    with open(filename, "wb") as buffer:  # 오디오 파일 복사
-        shutil.copyfileobj(upload_file.file, buffer)
+    if fileurl:
+        filename, _ = urlretrieve(fileurl)  # 오디오 파일 복사 (filename 예시: /tmp/tmpo613nsz5)
+        filename_only = filename.split("/")[-1]
+    else:
+        with open(filename, "wb") as buffer:  # 오디오 파일 복사
+            shutil.copyfileobj(upload_file.file, buffer)
+        filename_only = filename.split(".")[0]
 
     # Firestore 데이터 업데이트
     if not "duration" in collection.document(token).get().to_dict():  # duration 정보가 없는 경우 (upload_file을 file로 받은 경우)
@@ -37,7 +46,6 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
         collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
     else:
         collection.document(token).update({"status": "progress"})
-
 
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
@@ -54,7 +62,9 @@ def separate(upload_file: UploadFile = File(...), filename: str = Form(...), tok
             {"status": "done", "path": urls, "process_time": round((time.time() - start_time), 3)}
         )
         os.system(f"rm '{filename}' && rm -rf /separated")
+        logger.info(f"Separate Success ({token})")
     else:
         collection.document(token).update(  # Firestore 데이터 업데이트
             {"status": "fail", "process_time": round((time.time() - start_time), 3)}
         )
+        logger.error(f"Separate Fail ({token})")
