@@ -1,2 +1,4 @@
-curl -X POST https://klleon-main-n6my7u6wuq-dt.a.run.app/job_file -H "Content-Type:multipart/form-data" -F upload_file=@./test_5s.wav
-curl -X POST https://klleon-main-n6my7u6wuq-dt.a.run.app/result -H "Content-Type: application/json" -d '{"token":"f4ddb5b7-277f-4a08-8cca-1f7568415208"}'
+curl -X POST https://klleon-main-67zsjp2xba-dt.a.run.app/job-file -H "Content-Type:multipart/form-data" -F upload_file=@./test_5s.mp3
+curl -X POST https://klleon-main-67zsjp2xba-dt.a.run.app/job-url -H "Content-Type: application/json" -d '{"url":"https://storage.googleapis.com/klleon-output/test_5s.mp3"}'
+curl -X POST https://klleon-main-67zsjp2xba-dt.a.run.app/result -H "Content-Type: application/json" -d '{"token":"0fd73a0c-a40b-4d18-8dec-c4468eeca66a"}'
+curl -X GET https://klleon-main-67zsjp2xba-dt.a.run.app/all-result -H "Content-Type: application/json"
