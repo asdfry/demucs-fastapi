@@ -78,11 +78,11 @@ async def create_job_url(body=Body(...)):
     try:
         urlopen(url)  # 오디오 파일 복사 (filename 예시: /tmp/tmpo613nsz5)
 
-    except HTTPError:
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "HTTPError"})
+    except HTTPError as e:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": f"HTTPError ({e.reason})"})
 
-    except URLError:
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": "URLError"})
+    except URLError as e:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": f"URLError ({e.reason})"})
 
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": 400, "message": str(e)})

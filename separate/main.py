@@ -40,9 +40,16 @@ def separate(
         filename_only = filename.split(".")[0]
 
     # Firestore 데이터 업데이트
-    with audioread.audio_open(filename) as f:  # 오디오 정보 확인
-        duration = f.duration
-    collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
+    try:
+        with audioread.audio_open(filename) as f:  # 오디오 정보 확인
+            duration = f.duration
+        collection.document(token).update({"status": "progress", "duration": second_to_duration(duration)})
+    except:
+        os.system(f"rm '{filename}' && rm -rf /separated")
+        collection.document(token).update(  # Firestore 데이터 업데이트
+            {"status": "fail", "process_time": round((time.time() - start_time), 3)}
+        )
+        logger.error(f"Separate Fail ({token})")
 
     os.system(f"python3 -m demucs.separate --two-stems=vocals -d cpu '{filename}'")  # 음원 분리 실행
     output_files = glob(f"/separated/mdx_extra_q/{filename_only}/*")  # 결과 파일 리스트
